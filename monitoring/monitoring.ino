@@ -4,14 +4,14 @@
 #include <Adafruit_ST7789.h>
 #include <DHT.h>
 
-/** Macro Definitions **/
+/** Macro Pin Definitions **/
 #define DHT_PIN 4 
 #define DHT_TYPE DHT11
-DHT dht(DHT_PIN, DHT_TYPE);
-
 #define TFT_CS 10 // Chip Select Pin
 #define TFT_RST 8 // Reset Pin
 #define TFT_DC 9 // Data/Command Pin
+
+DHT dht(DHT_PIN, DHT_TYPE);
 Adafruit_ST7789 tft = Adafruit_ST7789(TFT_CS, TFT_DC, TFT_RST);
 
 void setup() {
