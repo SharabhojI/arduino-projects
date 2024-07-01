@@ -1,25 +1,25 @@
 /** Includes **/
 #include <Wire.h>
 #include <Adafruit_GFX.h>
-#include <Adafruit_ST7735.h>
+#include <Adafruit_ST7789.h>
 #include <DHT.h>
 
 /** Macro Definitions **/
-#define DHT_PIN 2 
+#define DHT_PIN 4 
 #define DHT_TYPE DHT11
 DHT dht(DHT_PIN, DHT_TYPE);
 
 #define TFT_CS 10 // Chip Select Pin
-#define TFT_RST 9 // Reset Pin
-#define TFT_DC 8 // Data/Command Pin
-Adafruit_ST7735 tft = Adafruit_ST7735(TFT_CS, TFT_DC, TFT_RST);
+#define TFT_RST 8 // Reset Pin
+#define TFT_DC 9 // Data/Command Pin
+Adafruit_ST7789 tft = Adafruit_ST7789(TFT_CS, TFT_DC, TFT_RST);
 
 void setup() {
   Serial.begin(9600);
   dht.begin(); // Initialize Humidity and Temp sensor
   
-  tft.initR(INITR_BLACKTAB); // Initialize Display
-  tft.setRotation(1);
+  tft.init(240, 320); // Initialize Display
+  tft.setRotation(0);
   tft.fillScreen(ST77XX_BLACK); // Fill black screen
 
   pinMode(3, INPUT); // Set Digital Pin 3 to from Flame Sensor
@@ -27,15 +27,9 @@ void setup() {
 }
 
 void loop() {
-  delay(2000); // 2000ms -> 2s delay for loop
+  delay(5000); // 5000ms -> 5s delay for loop
   float hum = dht.readHumidity();
   float temp = dht.readTemperature();
-
-  // If the temperature or humidity is not a number.
-  if (isnan(hum) || isnan(temp)) { 
-    Serial.println(F("Failed to read from HT Sensor")); // F-> Flash memory.
-    return; // Break out of the loop.
-  }
 
   int lightLevel = analogRead(A0); // Read light level from pin A0
   int flameDetected = digitalRead(3); // Read flame sensor from D3
@@ -63,7 +57,7 @@ void loop() {
   tft.setCursor(0, 70);
   tft.println(String(buf)); // Print Light Level
   
-  sprintf(buf, "Flame: %s", flameDetected == LOW ? "Detected" : "No");
+  sprintf(buf, "Flame Detected?: %s", flameDetected == HIGH ? "Yes" : "No");
   tft.setCursor(0, 90);
   tft.println(String(buf)); // Print Whether a flame has been detected or not
 }
