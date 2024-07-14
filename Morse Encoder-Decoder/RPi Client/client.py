@@ -1,59 +1,94 @@
-import threading
+import os
 import socket
+import threading
 import tkinter as tk
 from tkinter import scrolledtext
+from dotenv import load_dotenv, dotenv_values
 
-## Configuration ##
-host = ''
-port = 80
+# Load Environment Variables
+load_dotenv()
 
-## Morse Dictionary ##
+# Configuration
+arduino_ip = os.getenv("ARDUINO_IP")
+arduino_port = 80
+host = '0.0.0.0'  # Listen on all available network interfaces
+port = 8080
+
+# Morse Code Dictionary
 MORSE_CODE_DICT = {
-    '...': 'S', '---': 'O'
+    'A': '.-', 'B': '-...', 'C': '-.-.', 'D': '-..', 'E': '.', 'F': '..-.',
+    'G': '--.', 'H': '....', 'I': '..', 'J': '.---', 'K': '-.-', 'L': '.-..',
+    'M': '--', 'N': '-.', 'O': '---', 'P': '.--.', 'Q': '--.-', 'R': '.-.',
+    'S': '...', 'T': '-', 'U': '..-', 'V': '...-', 'W': '.--', 'X': '-..-',
+    'Y': '-.--', 'Z': '--..', '1': '.----', '2': '..---', '3': '...--',
+    '4': '....-', '5': '.....', '6': '-....', '7': '--...', '8': '---..',
+    '9': '----.', '0': '-----', ' ': '/'
 }
 
-## Decode Function ##
-def decode_message(msg):
-    return MORSE_CODE_DICT.get(msg.strip(), 'Unknown Character')
+def encode_morse(message):
+    return ' '.join(MORSE_CODE_DICT.get(char.upper(), 'NIL') for char in message)
 
-## Transmission Function ##
-def send_message():
-    msg = message_entry.get()
-    morse_msg = "... --- ..." # Sample Message (SOS) @TODO: Replace with conv logic
+def send_message(message):
+    morse_code = encode_morse(message)
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.connect((host, port))
-        s.sendall(morse_msg.encode())
+        s.connect((arduino_ip, arduino_port))
+        s.sendall(morse_code.encode() + b'\n')
+    update_sent_messages(message, morse_code)
+
+def update_sent_messages(original_message, morse_code):
+    messages_text.config(state=tk.NORMAL)
+    messages_text.insert(tk.END, f"Sent: '{original_message}' as '{morse_code}'\n")
+    messages_text.see(tk.END)
+    messages_text.config(state=tk.DISABLED)
+
+def receive_messages():
+    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server_socket.bind((host, port))
+    server_socket.listen(5)
+    print(f"Listening for connections on {host}:{port}...")
+
+    while True:
+        client_socket, addr = server_socket.accept()
+        print(f"Connection from {addr}")
+        while True:
+            data = client_socket.recv(1024)
+            if not data:
+                break
+            message = data.decode().strip()
+            update_received_messages(message)
+        client_socket.close()
+
+def update_received_messages(message):
+    messages_text.config(state=tk.NORMAL)
+    messages_text.insert(tk.END, f"{message}\n")
+    messages_text.see(tk.END)
+    messages_text.config(state=tk.DISABLED)
+
+def on_send_button_click():
+    message = message_entry.get()
+    send_message(message)
     message_entry.delete(0, tk.END)
 
-## Receive and Decode) ##
-def receive_message():
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.connect((host, port))
-        while True:
-            data = s.recv(1024)
-            if data:
-                morse_msg = data.decode()
-                decoded_msg = decode_message(morse_msg)
-                display_text.insert(tk.END, f"Recieved: {decoded_msg}\n")
-
-## GUI Setup ##
+# GUI setup
 root = tk.Tk()
-root.title("Morse Communicator")
+root.title("Morse Code Communicator")
+
 frame = tk.Frame(root)
-frame.pack(pady=20)
+frame.pack(pady=10)
 
-message_label = tk.Label(frame, text="Enter Message:")
-message_label.grid(row=0, column=0, padx=10)
+message_label = tk.Label(frame, text="Enter message:")
+message_label.pack(side=tk.LEFT)
+
 message_entry = tk.Entry(frame, width=50)
-message_entry.grid(row=0, column=1, padx=10)
-send_button = tk.Button(frame, text="Send", command=send_message)
-send_button.grid(row=0, column=2, padx=10)
-display_text = scrolledtext.ScrolledText(root, width=60, height=20)
-display_text.pack(pady=20)
+message_entry.pack(side=tk.LEFT, padx=10)
 
-## Receive Messages in new Thread ##
-receive_thread = threading.Thread(target=receive_message)
-reveive_thread.start()
+send_button = tk.Button(frame, text="Send", command=on_send_button_click)
+send_button.pack(side=tk.LEFT)
 
-## Start the GUI Event Loop ##
+messages_text = scrolledtext.ScrolledText(root, width=60, height=20, state=tk.DISABLED)
+messages_text.pack(pady=10)
+
+# Start the receiving thread
+threading.Thread(target=receive_messages, daemon=True).start()
+
 root.mainloop()
