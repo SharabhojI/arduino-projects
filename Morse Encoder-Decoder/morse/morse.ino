@@ -7,6 +7,8 @@
 // WiFi credentials
 const char* ssid = SECRET_SSID;
 const char* password = SECRET_PASS;
+const char* raspberryPiIP = SECRET_IP; 
+const int raspberryPiPort = 8080;
 
 // Pin definitions for TFT display and LED
 const int TFT_CS = 10;
@@ -70,6 +72,10 @@ void setup() {
 }
 
 void loop() {
+  // Flags for space and slash characters
+  static bool letterGapAdded = false; 
+  static bool wordGapAdded = false;
+
   // Receiving messages from the Raspberry Pi
   WiFiClient client = server.available();
   if (client) {
@@ -107,31 +113,53 @@ void loop() {
 
   // Transmit Morse code with button
   static unsigned long pressStartTime = 0;
+  static unsigned long lastReleaseTime = 0;
   static bool buttonPressed = false;
   static String morseMessage = "";
 
-  if (digitalRead(BUTTON_PIN) == LOW) {
-    if (!buttonPressed) { // Logic while button is not presed
+  if (digitalRead(BUTTON_PIN) == HIGH) { 
+    if (!buttonPressed) { // executes once per button press
       pressStartTime = millis();
       buttonPressed = true;
-      digitalWrite(LED_PIN, LOW); 
+      digitalWrite(LED_PIN, HIGH);
+      letterGapAdded = false;  // Reset letterGapAdded when starting a new letter
+      wordGapAdded = false;    // Reset wordGapAdded when starting a new letter
     }
-  } else {
-    if (buttonPressed) { // Logic to handle button press
+  } else { // case where button reads low (released)
+    if (buttonPressed) { // Button release logic
       unsigned long pressDuration = millis() - pressStartTime;
       if (pressDuration < 500) { // Dot
         morseMessage += ".";
       } else { // Dash
         morseMessage += "-";
       }
-      digitalWrite(LED_PIN, HIGH); // Turn on LED
+      digitalWrite(LED_PIN, LOW); 
       buttonPressed = false;
-      delay(300); // Debounce delay
+      lastReleaseTime = millis();
+    } else { // Check for gaps between characters and words
+      unsigned long gapDuration = millis() - lastReleaseTime;
+      // if the gap is greater than LETTER_GAP and no letter gap yet
+      if (gapDuration > LETTER_GAP && morseMessage.length() > 0 && !letterGapAdded) { 
+        morseMessage += " "; // append space between letters
+        letterGapAdded = true;
+      }
+      // if gap duration greater than WORD_GAP
+      if (gapDuration > WORD_GAP && morseMessage.length() > 0 && !wordGapAdded) {
+        morseMessage += "/ "; // append slash and space to separate word
+        wordGapAdded = true;
 
-      // Send the Morse message to the Raspberry Pi
-      if (client.connected()) {
-        client.print(morseMessage);
-        morseMessage = "";
+        // Send the Morse message to the Raspberry Pi        
+        WiFiClient client;
+        if (client.connect(raspberryPiIP, raspberryPiPort)) {
+          client.println(morseMessage);
+          client.stop();
+          Serial.println("Sent to Raspberry Pi: " + morseMessage);
+          morseMessage = "";
+          letterGapAdded = false;
+          wordGapAdded = false;
+        } else {
+          Serial.println("Failed to connect to the Raspberry Pi");
+        }
       }
     }
   }

@@ -25,8 +25,19 @@ MORSE_CODE_DICT = {
     '9': '----.', '0': '-----', ' ': '/'
 }
 
+REVERSE_MORSE_DICT = {value: key for key, value in MORSE_CODE_DICT.items()}
+
 def encode_morse(message):
     return ' '.join(MORSE_CODE_DICT.get(char.upper(), 'NIL') for char in message)
+
+def decode_morse(morse_code):
+    words = morse_code.split('/')
+    decoded_words = []
+    for word in words:
+        letters = word.strip().split()
+        decoded_word = ''.join(REVERSE_MORSE_DICT.get(letter, 'NIL') for letter in letters)
+        decoded_words.append(decoded_word)
+    return ' '.join(decoded_words)
 
 def send_message(message):
     morse_code = encode_morse(message)
@@ -50,17 +61,16 @@ def receive_messages():
     while True:
         client_socket, addr = server_socket.accept()
         print(f"Connection from {addr}")
-        while True:
-            data = client_socket.recv(1024)
-            if not data:
-                break
-            message = data.decode().strip()
+        data = client_socket.recv(1024)
+        message = data.decode().strip()
+        if message: # Process non-empty messages only
             update_received_messages(message)
         client_socket.close()
 
 def update_received_messages(message):
+    decoded_message = decode_morse(message)
     messages_text.config(state=tk.NORMAL)
-    messages_text.insert(tk.END, f"{message}\n")
+    messages_text.insert(tk.END, f"Received: '{message}', Decoded as: '{decoded_message}'\n")
     messages_text.see(tk.END)
     messages_text.config(state=tk.DISABLED)
 
